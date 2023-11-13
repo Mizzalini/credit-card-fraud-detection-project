@@ -9,6 +9,7 @@ output_filepath='./assets/processedFraudTrain.csv'
 
 ## READ CSV FILE INTO DATAFRAME ##
 raw_df = pd.read_csv(input_filepath)
+# raw_df = raw_df.sample(frac=0.01)  # TEMP
 raw_df = raw_df.sort_values(by=['trans_date_trans_time'])
 raw_df['trans_date_trans_time'] = pd.to_datetime(raw_df['trans_date_trans_time'])
 
@@ -23,6 +24,7 @@ def add_original_columns():
     processed_df['cc_num'] = raw_df['cc_num']
     processed_df['amt'] = raw_df['amt']
     processed_df['job'] = raw_df['job']
+    processed_df['is_fraud'] = raw_df['is_fraud']
 
     print("added original columns")
 
@@ -51,17 +53,14 @@ def add_age_column():
 ## zip code is associated to billing address of credit card
 ## merch_lat - Latitude Location of Merchant
 ## merch_long - Longitude Location of Merchant
+## trans_date_trans_time - Time of transaction already in datetime format
+
 ## unix_time - UNIX Time of transaction
 ## trans_num - Transaction Number
 ## cc_num - Credit Card Number
 ## street - Street Address of Credit Card Holder
 ## city - City of Credit Card Holder
 ## state - State of Credit Card Holder
-
-## number of retail locations per day in a time frame
-
-## minimum number of minutes between transactions of two retail locations in a time frame
-
 
 def add_maximum_amount_per_transaction_over_timeframe_column(column_name, timeframe):
     ## maximum amount spent per transaction over a month on all transactions ##
@@ -84,16 +83,42 @@ def add_total_number_of_transactions_column():
 
     print(f"added total number of transactions column")
 
-## number of retail locations per day in a time frame
-'''
+## number of total retail locations
 def add_total_number_of_unique_zip_codes_column():
-    def nunique_zip(group):
-        return group['zip'].nunique()
-
-    processed_df["total number of transactions"] = raw_df.groupby('cc_num').transform(nunique_zip)
+    processed_df["total_number_of_transactions"] = raw_df.groupby('cc_num')['zip'].transform('nunique')
 
     print(f"added total unique zip codes column")
-'''
+
+## number of retail locations per day in a time frame TODO
+#def add_number_of_unique_zip_codes_in_timeframe_column(column_name, timeframe):
+    # couldn't do
+
+## minimum number of minutes between transactions of two retail locations in a time frame
+#def minimum_minutes_(column_name, timeframe):
+    # couldn't do
+
+def calculate_speed():
+    from geopy.distance import geodesic
+
+    def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+        coords_1 = (lat1, lon1)
+        coords_2 = (lat2, lon2)
+        return geodesic(coords_1, coords_2).meters
+
+    # Sort the DataFrame by 'cc_num' and 'trans_date_trans_time'
+    raw_df.sort_values(by=['cc_num', 'trans_date_trans_time'], inplace=True)
+
+    raw_df['time_diff'] = raw_df.groupby('cc_num')['trans_date_trans_time'].diff().dt.total_seconds()
+
+    raw_df['lat_diff'] = raw_df.groupby('cc_num')['merch_lat'].diff().fillna(0)
+    raw_df['lon_diff'] = raw_df.groupby('cc_num')['merch_long'].diff().fillna(0)
+
+    raw_df['distance'] = raw_df.apply(lambda row: calculate_haversine_distance(row['merch_lat'], row['merch_long'], row['merch_lat'] - row['lat_diff'], row['merch_long'] - row['lon_diff']), axis=1)
+
+    # Calculate the speed (distance divided by time)
+    processed_df['speed'] = raw_df['distance'] / raw_df['time_diff']
+
+    print("calculated speed")
 
 add_original_columns()
 add_category_column()
@@ -103,7 +128,9 @@ add_total_number_of_transactions_column()
 add_maximum_amount_per_transaction_over_timeframe_column("maximum amount per transaction over 30 days", '30D')
 add_average_amount_per_transaction_over_timeframe_column("average amount per transaction over 30 days", '30D')
 
-#add_total_number_of_unique_zip_codes_column()
+add_total_number_of_unique_zip_codes_column()
+
+calculate_speed()
 
 ## SAVE TO CSV FILE ##
 processed_df.to_csv(output_filepath, index=False)
