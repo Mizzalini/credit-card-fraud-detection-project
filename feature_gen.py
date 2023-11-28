@@ -1,8 +1,8 @@
 import pandas as pd
 
 # Constants
-INPUT_FILEPATH = './assets/fraudTrain.csv'
-OUTPUT_FILEPATH = './assets/processedFraudTrain.csv'
+# INPUT_FILEPATH = './assets/fraudTrain.csv'
+OUTPUT_FILEPATH = 'assets/processedFraudTrain.csv'
 TIME_FRAME = '30D'
 
 # Define functions to add columns to the DataFrame
@@ -128,7 +128,7 @@ def create_df(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
     processed_df.to_csv(OUTPUT_FILEPATH, index=False)
     print(f"Processed DataFrame saved to {OUTPUT_FILEPATH}")
     
-def main() -> None:
+def main() -> str:
     """
     Main function for processing fraud data.
 
@@ -139,17 +139,18 @@ def main() -> None:
         None
         
     Returns:
-        None
+        str: The filepath of the processed dataframe.
     """
     # Read CSV file into DataFrame
     try:
-        raw_df = pd.read_csv(INPUT_FILEPATH)
+        input_filepath = input("Input file: ")
+        raw_df = pd.read_csv(input_filepath)
     except FileNotFoundError as e:
-        print(f"Error: File not found at {INPUT_FILEPATH}")
+        print(f"Error: File not found at {input_filepath}")
         print(e)
         return
     except pd.errors.EmptyDataError as e:
-        print(f"Error: Empty data or invalid file format in {INPUT_FILEPATH}")
+        print(f"Error: Empty data or invalid file format in {input_filepath}")
         print(e)
         return
     
