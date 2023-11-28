@@ -1,62 +1,98 @@
-## Import necessary libraries 
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier
-
 from sklearn.metrics import accuracy_score, classification_report
 
-def processDB(file):
-    ## Read training dataset
-    data = pd.read_csv(file)
+# Constants
+DATA = 'assets/processedFraudTrain.csv'
+MAX_DEPTH = 10
 
-    ## Clean dataset
+def read_and_clean_data(file_path: str) -> pd.DataFrame:
+    """
+    Read the dataset from the given file path and perform necessary cleaning.
+
+    Args:
+        file_path (str): The path to the CSV file.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    data = pd.read_csv(file_path)
+
+    # Drop rows with missing values
     data.dropna(inplace=True)
 
     # Label encoding for binary categories
     label_encoder = LabelEncoder()
     data['category'] = label_encoder.fit_transform(data['category'])
 
-    # Frequency encoding for high-cardinality categories
-    frequency_map = data['merchant'].value_counts().to_dict()
-    data['merchant'] = data['merchant'].map(frequency_map)
-
-    # Extract date and time components
-    data['trans_date_trans_time'] = pd.to_datetime(data['trans_date_trans_time'])
-    data['trans_year'] = data['trans_date_trans_time'].dt.year
-    data['trans_month'] = data['trans_date_trans_time'].dt.month
-    data['trans_day'] = data['trans_date_trans_time'].dt.day
-    data['trans_hour'] = data['trans_date_trans_time'].dt.hour
-    data['trans_minute'] = data['trans_date_trans_time'].dt.minute
-    data['trans_second'] = data['trans_date_trans_time'].dt.second
-
     return data
 
-processedData = processDB('assets/fraudTrain.csv')
+def train_dtc(X: pd.DataFrame, y: pd.Series, max_depth: int) -> DecisionTreeClassifier:
+    """
+    Train a decision tree classifier.
 
-# Select features and target variable
-# features = ['merchant', 'category', 'amt', 'unix_time', 'merch_lat', 'merch_long', 'trans_year', 'trans_month', 'trans_day', 'trans_hour', 'trans_minute', 'trans_second']
-features = ['category', 'amt', 'city_pop']
-X_train = processedData[features]
-y_train = processedData['is_fraud']
+    Args:
+        X (pd.DataFrame): Features DataFrame.
+        y (pd.Series): Target variable.
+        max_depth (int): Maximum depth of the decision tree.
 
-# Create a decision tree classifier
-clf = DecisionTreeClassifier(max_depth=10)
+    Returns:
+        DecisionTreeClassifier: Trained classifier.
+    """
+    clf = DecisionTreeClassifier(max_depth=max_depth)
+    clf.fit(X, y)
+    return clf
 
-# Train the model
-clf.fit(X_train, y_train)
+def eval_classifier(clf: DecisionTreeClassifier, X_test: pd.DataFrame, y_test: pd.Series) -> None:
+    """
+    Evaluate the classifier on the test set and print accuracy and classification report.
 
-# Evaluate the model (optional)
-# If you want to evaluate the model's performance on the training data, you can use the same code as before, with X and y being the full dataset
+    Args:
+        clf (DecisionTreeClassifier): Trained classifier.
+        X_test (pd.DataFrame): Test set features.
+        y_test (pd.Series): Test set target variable.
 
-testData = processDB('assets/fraudTest.csv')
+    Returns:
+        None
+    """
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred)
 
-X_test = testData[features]
-y_test = testData['is_fraud']
+    print(f"Accuracy: {accuracy:.2f}")
+    print(report)
+    
+def main() -> None:
+    # Process training data
+    processed_data_train = read_and_clean_data('assets/processedFraudTrain.csv')
 
-y_pred = clf.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-report = classification_report(y_test, y_pred)
+    # Select features and target variable for training
+    features_train = ['category', 'amt', 'city_pop', 'total_transactions', 'average amount over 30 days', 'maximum amount over 30 days']
+    X_train = processed_data_train[features_train]
+    y_train = processed_data_train['is_fraud']
 
-print(f"Accuracy: {accuracy:.2f}")
-print(report)
+    # Train the decision tree classifier
+    clf = train_dtc(X_train, y_train, MAX_DEPTH)
+    
+    # Printing the importance of each feature
+    print(clf.feature_importances_)
+
+    # # Evaluate the classifier on the test set
+    # processed_data_test = read_and_clean_data('assets/fraudTest.csv')
+    
+    # # Check if features are present in the test data
+    # features_test = features_train
+    # missing_features = set(features_test) - set(processed_data_test.columns)
+    
+    # if missing_features:
+    #     raise ValueError(f"Missing features in test data: {missing_features}")
+    
+    # features_test = features_train  # Assuming the same features are used for testing
+    # X_test = processed_data_test[features_test]
+    # y_test = processed_data_test['is_fraud']
+    
+    # eval_classifier(clf, X_test, y_test)
+
+if __name__ == '__main__':
+    main()
