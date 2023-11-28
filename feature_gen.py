@@ -1,116 +1,165 @@
 import pandas as pd
 
-input_filepath='./assets/fraudTrain.csv'
-output_filepath='./assets/processedFraudTrain.csv'
+# Constants
+INPUT_FILEPATH = './assets/fraudTrain.csv'
+OUTPUT_FILEPATH = './assets/processedFraudTrain.csv'
+TIME_FRAME = '30D'
 
-# Read CSV file into DataFrame
-raw_df = pd.read_csv(input_filepath)
-raw_df['trans_date_trans_time'] = pd.to_datetime(raw_df['trans_date_trans_time'])
-raw_df = raw_df.sort_values(by=['cc_num', 'trans_date_trans_time'])
+# Define functions to add columns to the DataFrame
 
-processed_df = pd.DataFrame()
+def add_original_columns(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+    """
+    Add original columns directly from the original DataFrame.
 
-# Define function to add columns to the DataFrame
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which columns will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
 
-# Columns directly from original
-def add_original_columns():
-    processed_df['cc_num'] = raw_df['cc_num']
-    processed_df['amt'] = raw_df['amt']
-    processed_df['is_fraud'] = raw_df['is_fraud']
-    processed_df['trans_date_trans_time'] = raw_df['trans_date_trans_time']
-    processed_df['category'] = raw_df['category']
-    processed_df['city_pop'] = raw_df['city_pop']
+    Returns:
+        None
+    """
+    columns_to_copy = ['cc_num', 'amt', 'is_fraud', 'trans_date_trans_time', 'category', 'city_pop']
+    processed_df[columns_to_copy] = raw_df[columns_to_copy]
+    print("Added Original columns")
 
-    print("Added original columns")
-    
-def add_time_columns():
+def add_time_columns(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+    """
+    Add columns related to transaction time.
+
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which columns will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
+
+    Returns:
+        None
+    """
     processed_df['trans_year'] = raw_df['trans_date_trans_time'].dt.year
     processed_df['trans_month'] = raw_df['trans_date_trans_time'].dt.month
     processed_df['trans_day'] = raw_df['trans_date_trans_time'].dt.day
     processed_df['trans_hour'] = raw_df['trans_date_trans_time'].dt.hour
+    print("Added Time columns")
 
-    print("added time columns")
+def add_time_since_last_purchase(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+    """
+    Add a column representing time since the last purchase for each buyer.
 
-def add_age_column():
-    ## age
-    raw_df['dob'] = pd.to_datetime(raw_df['dob'])
-    processed_df['age'] = (pd.Timestamp('now') - raw_df['dob']).astype('<m8[Y]').astype(int)
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which the column will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
 
-    print("added age column")
-
-# Time passed since last purchase
-def add_time_since_last_purchase():
+    Returns:
+        None
+    """
     processed_df['time_since_last_purchase'] = raw_df.groupby('cc_num')['trans_date_trans_time'].diff()
-    # Note that if there's no previous transaction for a buyer, the column will be ''
-    
-    print(f"Added Time Since Last Purchase column")
+    print("Added Time Since Last Purchase column")
 
-# Total number of transactions for the buyer
-def add_total_transactions():
+def add_total_transactions(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+    """
+    Add a column representing the total number of transactions for each buyer.
+
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which the column will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
+
+    Returns:
+        None
+    """
     processed_df['total_transactions'] = raw_df.groupby('cc_num')['cc_num'].transform('count')
-    
-    print(f"Added Total Transactions column")
+    print("Added Total Transactions column")
 
-# Average amount spent per transaction for buyer in a time frame
-def add_avg_transaction_over_timeframe(column_name, timeframe):
-    def calculate_average(group):
-        return group.rolling(window=timeframe, on='trans_date_trans_time')['amt'].mean()
+def add_avg_transaction_over_timeframe(processed_df: pd.DataFrame, raw_df: pd.DataFrame, column_name: str, time_frame: str) -> None:
+    """
+    Add a column representing the average transaction amount over a specified time frame.
+
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which the column will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
+        column_name (str): The name of the new column.
+        time_frame (str): The time frame for rolling window calculations.
+
+    Returns:
+        None
+    """
+    def calculate_average(group: pd.DataFrame) -> pd.Series:
+        # Calculate the average transaction amount over a specified time frame for a group of transactions.
+        return group.rolling(window=time_frame, on='trans_date_trans_time')['amt'].mean()
 
     processed_df[column_name] = raw_df.groupby('cc_num', group_keys=False, as_index=False).apply(calculate_average)
+    print(f"Added Average Transaction Over {time_frame} column")
 
-    
-    print(f"Added Average Transaction Over {timeframe} column")
+def add_max_transaction_over_timeframe(processed_df: pd.DataFrame, raw_df: pd.DataFrame, column_name: str, time_frame: str) -> None:
+    """
+    Add a column representing the maximum transaction amount over a specified time frame.
 
-# Maximum amount spent for buyer in a time frame
-def add_max_transaction_over_timeframe(column_name, timeframe):
-    def calculate_max(group):
-        return group.rolling(window=timeframe, on='trans_date_trans_time')['amt'].max()
+    Args:
+        processed_df (pd.DataFrame): The DataFrame to which the column will be added.
+        raw_df (pd.DataFrame): The original DataFrame containing the source columns.
+        column_name (str): The name of the new column.
+        time_frame (str): The time frame for rolling window calculations.
+
+    Returns:
+        None
+    """
+    def calculate_max(group: pd.DataFrame) -> pd.Series:
+        # Calculate the maximum transaction amount over a specified time frame for a group of transactions.
+        return group.rolling(window=time_frame, on='trans_date_trans_time')['amt'].max()
 
     processed_df[column_name] = raw_df.groupby('cc_num', group_keys=False, as_index=False).apply(calculate_max)
+    print(f"Added Maximum Transaction Over {time_frame} column")
 
+def create_df(processed_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+    """
+    Create the final processed DataFrame and save it to a CSV file.
+
+    Args:
+        processed_df (pd.DataFrame): The DataFrame containing processed data.
+        raw_df (pd.DataFrame): The original DataFrame containing source data.
+
+    Returns:
+        None
+    """
+    add_original_columns(processed_df, raw_df)
+    add_time_columns(processed_df, raw_df)
+    add_time_since_last_purchase(processed_df, raw_df)
+    add_total_transactions(processed_df, raw_df)
+    add_avg_transaction_over_timeframe(processed_df, raw_df, "average amount over 30 days", TIME_FRAME)
+    add_max_transaction_over_timeframe(processed_df, raw_df, "maximum amount over 30 days", TIME_FRAME)
+
+    processed_df.to_csv(OUTPUT_FILEPATH, index=False)
+    print(f"Processed DataFrame saved to {OUTPUT_FILEPATH}")
     
-    print(f"Added Maximum Transaction Over {timeframe} column")
+def main() -> None:
+    """
+    Main function for processing fraud data.
 
-## number of total retail locations
-def add_total_number_of_unique_zip_codes_column():
-    processed_df["unique_zip_codes"] = raw_df.groupby('cc_num')['zip'].transform('nunique')
-
-    print(f"added total unique zip codes column")
+    Reads a CSV file containing fraud data, performs various data processing tasks,
+    and saves the processed data to a new CSV file.
     
-def calculate_speed():
-    from geopy.distance import geodesic
-
-    def calculate_haversine_distance(lat1, lon1, lat2, lon2):
-        coords_1 = (lat1, lon1)
-        coords_2 = (lat2, lon2)
-        return geodesic(coords_1, coords_2).meters
-
-    # Sort the DataFrame by 'cc_num' and 'trans_date_trans_time'
-    raw_df.sort_values(by=['cc_num', 'trans_date_trans_time'], inplace=True)
-
-    raw_df['time_diff'] = raw_df.groupby('cc_num')['trans_date_trans_time'].diff().dt.total_seconds()
-
-    raw_df['lat_diff'] = raw_df.groupby('cc_num')['merch_lat'].diff().fillna(0)
-    raw_df['lon_diff'] = raw_df.groupby('cc_num')['merch_long'].diff().fillna(0)
-
-    raw_df['distance'] = raw_df.apply(lambda row: calculate_haversine_distance(row['merch_lat'], row['merch_long'], row['merch_lat'] - row['lat_diff'], row['merch_long'] - row['lon_diff']), axis=1)
-
-    # Calculate the speed (distance divided by time)
-    processed_df['speed'] = raw_df['distance'] / raw_df['time_diff']
-
-    print("calculated speed")
+    Args:
+        None
+        
+    Returns:
+        None
+    """
+    # Read CSV file into DataFrame
+    try:
+        raw_df = pd.read_csv(INPUT_FILEPATH)
+    except FileNotFoundError as e:
+        print(f"Error: File not found at {INPUT_FILEPATH}")
+        print(e)
+        return
+    except pd.errors.EmptyDataError as e:
+        print(f"Error: Empty data or invalid file format in {INPUT_FILEPATH}")
+        print(e)
+        return
     
-def create_df():
-    add_original_columns()
-    add_time_columns()
-    # add_age_column()
-    add_time_since_last_purchase()
-    add_total_transactions()
-    add_avg_transaction_over_timeframe("average amount over 30 days", '30D')
-    add_max_transaction_over_timeframe("maximum amount over 30 days", '30D')
-    # add_total_number_of_unique_zip_codes_column()
-    # calculate_speed()
+    raw_df['trans_date_trans_time'] = pd.to_datetime(raw_df['trans_date_trans_time'])
+    raw_df = raw_df.sort_values(by=['cc_num', 'trans_date_trans_time'])
     
-    processed_df.to_csv(output_filepath, index=False)
-    
-create_df()
+    # Initialize processed DataFrame
+    processed_df = pd.DataFrame()
+    create_df(processed_df, raw_df)
+
+# Call the main function to create and save the processed DataFrame
+if __name__ == '__main__':
+    main()  
