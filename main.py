@@ -64,6 +64,18 @@ def eval_classifier(clf: DecisionTreeClassifier, X_test: pd.DataFrame, y_test: p
     print(report)
     
 def main() -> None:
+    """
+    Main function for training & testing dataset.
+
+    Reads in a processed dataset and cleans it. Selects the features for training.
+    Trains the Decision Tree Classifier and evaluates it on the test set.
+    
+    Args:
+        None
+        
+    Returns:
+        None
+    """
     # Process training data
     processed_data_train = read_and_clean_data('assets/processedFraudTrain.csv')
 
